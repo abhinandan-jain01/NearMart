@@ -120,27 +120,98 @@ const { isCustomer } = require('../middleware/auth');
 // @route   POST /api/customer/signup
 // @desc    Register a new customer
 // @access  Public
+// router.post('/signup', async (req, res) => {
+//   try {
+//     const { name, email, password, phone, location, address } = req.body;
+
+//     if (!name || !email || !password || !location || !address) {
+//       return res.status(400).json({
+//         success: false,
+//         message: 'Please provide all required fields'
+//       });
+//     }
+
+//     if (!address.street || !address.city || !address.state || !address.zipCode) {
+//       return res.status(400).json({
+//         success: false,
+//         message: 'Please provide complete address information'
+//       });
+//     }
+
+//     const existingCustomer = await Customer.findOne({ email });
+//     if (existingCustomer) {
+//       return res.status(400).json({
+//         success: false,
+//         message: 'Customer with this email already exists'
+//       });
+//     }
+
+//     if (!location.type || !location.coordinates || location.type !== 'Point' || 
+//         !Array.isArray(location.coordinates) || location.coordinates.length !== 2) {
+//       return res.status(400).json({
+//         success: false,
+//         message: 'Invalid location format. Must be GeoJSON Point with coordinates [longitude, latitude]'
+//       });
+//     }
+
+//     const customer = new Customer({
+//       name,
+//       email,
+//       password, // Will be hashed by pre-save hook
+//       phone,
+//       location,
+//       address
+//     });
+
+//     // Save customer to DB
+//     await customer.save();
+
+//     // Generate JWT token
+//     const token = customer.generateAuthToken();
+
+//     res.status(201).json({
+//       success: true,
+//       message: 'Customer registered successfully',
+//       token,
+//       customer: {
+//         id: customer._id,
+//         name: customer.name,
+//         email: customer.email
+//       }
+//     });
+//   } catch (error) {
+//     console.error('Customer signup error:', error);
+//     res.status(500).json({
+//       success: false,
+//       message: 'Server error',
+//       error: process.env.NODE_ENV === 'development' ? error.message : undefined
+//     });
+//   }
+// });
+const axios = require('axios');
+const dotenv = require('dotenv');
+dotenv.config();
+
 router.post('/signup', async (req, res) => {
   try {
-    const { name, email, password, phone, location, address } = req.body;
+    const { name, email, password, phone, address } = req.body;
 
-    // Basic validation
-    if (!name || !email || !password || !location || !address) {
+    if (!name || !email || !password || !address) {
       return res.status(400).json({
         success: false,
-        message: 'Please provide all required fields'
+        message: 'Please provide all required fields: name, email, password, phone, and address'
       });
     }
 
-    // Validate address
-    if (!address.street || !address.city || !address.state || !address.zipCode) {
+    // Validate address structure
+    if (typeof address !== 'object' || !address.street || !address.city || !address.state || !address.zipCode) {
       return res.status(400).json({
         success: false,
-        message: 'Please provide complete address information'
+        message: 'Please provide complete address: street, city, state, zipCode'
       });
     }
 
-    // Check if email already exists
+    // Check for existing email
     const existingCustomer = await Customer.findOne({ email });
     if (existingCustomer) {
       return res.status(400).json({
@@ -149,26 +220,52 @@ router.post('/signup', async (req, res) => {
       });
     }
 
-    // Validate location format
-    if (!location.type || !location.coordinates || location.type !== 'Point' || 
-        !Array.isArray(location.coordinates) || location.coordinates.length !== 2) {
+    // Compose full address string
+    const fullAddress = `${address.street}, ${address.city}, ${address.state}, ${address.zipCode}`;
+    const geocodeUrl = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(fullAddress)}&format=json&limit=1&addressdetails=1`;
+
+    let location;
+    try {
+      const geoRes = await axios.get(geocodeUrl, {
+        timeout: 5000,
+        headers: {
+          'User-Agent': 'uCampusApp/1.0 (your_email@example.com)' // Replace with your contact info as per Nominatim policy
+        }
+      });
+
+      if (!geoRes.data || geoRes.data.length === 0) {
+        return res.status(400).json({
+          success: false,
+          message: 'Unable to geocode address. Please check the input values.'
+        });
+      }
+
+      location = {
+        type: 'Point',
+        coordinates: [
+          parseFloat(geoRes.data[0].lon),
+          parseFloat(geoRes.data[0].lat)
+        ]
+      };
+    } catch (geoError) {
+      console.error('Geocoding failed:', geoError.message);
       return res.status(400).json({
         success: false,
-        message: 'Invalid location format. Must be GeoJSON Point with coordinates [longitude, latitude]'
+        message: 'Geocoding failed. Try again later.',
+        error: process.env.NODE_ENV === 'development' ? geoError.message : 'GEOCODING_ERROR'
       });
     }
 
-    // Create new customer
+    // Create and save customer
     const customer = new Customer({
       name,
       email,
-      password, // Will be hashed by pre-save hook
+      password, // hashed in pre-save
       phone,
-      location,
-      address
+      address,
+      location
     });
 
-    // Save customer to DB
     await customer.save();
 
     // Generate JWT token
@@ -193,6 +290,7 @@ router.post('/signup', async (req, res) => {
     });
   }
 });
+
 
 /**
  * @swagger
