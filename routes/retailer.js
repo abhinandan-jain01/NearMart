@@ -137,160 +137,418 @@ const { isRetailer } = require('../middleware/auth');
 // @route   POST /api/retailer/signup
 // @desc    Register a new retailer
 // @access  Public
-router.post('/signup', async (req, res) => {
-  console.log('\n============== RETAILER SIGNUP REQUEST ==============');
+// router.post('/signup', async (req, res) => {
+//   // console.log('\n============== RETAILER SIGNUP REQUEST ==============');
   
+//   try {
+//     const { name, email, password, storeName, phone, storeDescription, address, location } = req.body;
+    
+//     console.log(`Signup attempt for: ${email || 'unknown email'}`);
+    
+//     let missingFields = [];
+//     if (!name) missingFields.push('name');
+//     if (!email) missingFields.push('email');
+//     if (!password) missingFields.push('password');
+//     if (!storeName) missingFields.push('storeName');
+    
+//     if (missingFields.length > 0) {
+//       console.log('Missing required fields:', missingFields.join(', '));
+//       return res.status(400).json({
+//         success: false,
+//         message: `Missing required fields: ${missingFields.join(', ')}`,
+//         missingFields
+//       });
+//     }
+    
+//     const existingRetailer = await Retailer.findOne({ email });
+//     if (existingRetailer) {
+//       console.log('Email already exists:', email);
+//       return res.status(400).json({
+//         success: false,
+//         message: 'A retailer with this email already exists',
+//         error: 'EMAIL_ALREADY_EXISTS'
+//       });
+//     }
+    
+//     if (!address && !location) {
+//       console.log('Missing both address and location');
+//       return res.status(400).json({
+//         success: false,
+//         message: 'Either address or location is required',
+//         error: 'ADDRESS_OR_LOCATION_REQUIRED'
+//       });
+//     }
+    
+//     if (address) {
+//       if (typeof address !== 'object') {
+//         console.log('Invalid address format (not an object)');
+//         return res.status(400).json({
+//           success: false,
+//           message: 'Address must be an object containing street, city, state, and zipCode fields',
+//           error: 'INVALID_ADDRESS_FORMAT'
+//         });
+//       }
+      
+//       const missingAddressFields = [];
+//       if (!address.street) missingAddressFields.push('street');
+//       if (!address.city) missingAddressFields.push('city');
+//       if (!address.state) missingAddressFields.push('state');
+//       if (!address.zipCode) missingAddressFields.push('zipCode');
+      
+//       if (missingAddressFields.length > 0) {
+//         console.log('Incomplete address, missing fields:', missingAddressFields.join(', '));
+//         return res.status(400).json({
+//           success: false,
+//           message: `Address is incomplete. Missing fields: ${missingAddressFields.join(', ')}`,
+//           missingAddressFields
+//         });
+//       }
+      
+//       console.log('Valid address provided for geocoding');
+//     }
+    
+//     // 5. Validate location format if provided
+//     if (location) {
+//       if (!location.type || !location.coordinates || location.type !== 'Point' || 
+//           !Array.isArray(location.coordinates) || location.coordinates.length !== 2) {
+//         console.log('Invalid location format');
+//         return res.status(400).json({
+//           success: false,
+//           message: 'Invalid location format. Must be GeoJSON Point with coordinates [longitude, latitude]',
+//           error: 'INVALID_LOCATION_FORMAT'
+//         });
+//       }
+      
+//       console.log('Valid location coordinates provided');
+//     }
+
+//     // 6. All validation passed, create new retailer
+//     console.log('Creating new retailer account...');
+    
+//     // Create retailer object with required fields
+//     const retailerData = {
+//       name,
+//       email,
+//       password, // Will be hashed by pre-save hook
+//       storeName
+//     };
+    
+//     // Add optional fields if they exist
+//     if (phone) retailerData.phone = phone;
+//     if (storeDescription) retailerData.storeDescription = storeDescription;
+//     if (address) retailerData.address = address;
+//     if (location) retailerData.location = location;
+    
+//     // Create new retailer
+//     const retailer = new Retailer(retailerData);
+    
+//     // Save retailer to DB with geocoding middleware processing
+//     try {
+//       const savedRetailer = await retailer.save();
+//       console.log('Retailer saved successfully with ID:', savedRetailer._id);
+      
+//       if (savedRetailer.location && savedRetailer.location.coordinates) {
+//         console.log('Location coordinates:', savedRetailer.location.coordinates);
+//       }
+//     } catch (saveError) {
+//       console.error('Error saving retailer:', saveError);
+//       return res.status(500).json({
+//         success: false,
+//         message: 'Failed to create retailer account',
+//         error: process.env.NODE_ENV === 'development' ? saveError.message : 'Database error'
+//       });
+//     }
+
+//     // Generate JWT token for authentication
+//     const token = retailer.generateAuthToken();
+
+//     res.status(201).json({
+//       success: true,
+//       message: 'Retailer registered successfully',
+//       token,
+//       retailer: {
+//         id: retailer._id,
+//         name: retailer.name,
+//         email: retailer.email,
+//         storeName: retailer.storeName
+//       }
+//     });
+//   } catch (error) {
+//     console.error('Retailer signup error:', error);
+    
+//     // Handle specific geocoding errors
+//     if (error.message && error.message.includes('Geocoding failed')) {
+//       return res.status(400).json({
+//         success: false,
+//         message: 'Could not geocode the provided address. Please check the address and try again.',
+//         error: process.env.NODE_ENV === 'development' ? error.message : undefined
+//       });
+//     }
+    
+//     // Handle MongoDB duplicate key errors
+//     if (error.name === 'MongoServerError' && error.code === 11000) {
+//       return res.status(400).json({
+//         success: false,
+//         message: 'A retailer with this email already exists',
+//         error: 'EMAIL_ALREADY_EXISTS'
+//       });
+//     }
+    
+//     // Handle validation errors
+//     if (error.name === 'ValidationError') {
+//       const validationErrors = {};
+      
+//       for (const field in error.errors) {
+//         validationErrors[field] = error.errors[field].message;
+//       }
+      
+//       console.log('Validation error details:', validationErrors);
+      
+//       return res.status(400).json({
+//         success: false,
+//         message: 'Validation error',
+//         errors: validationErrors
+//       });
+//     }
+    
+//     // Default error response for unhandled errors
+//     console.error('Unhandled error in retailer signup:', error);
+//     res.status(500).json({
+//       success: false,
+//       message: 'Server error',
+//       error: process.env.NODE_ENV === 'development' ? error.message : undefined
+//     });
+//   }
+// });
+// const axios = require('axios'); // Add axios for API requests
+// const dotenv = require('dotenv');
+// dotenv.config();
+
+// router.post('/signup', async (req, res) => {
+//   try {
+//     const { name, email, password, storeName, phone, storeDescription, address } = req.body;
+
+//     if (!name || !email || !password || !storeName || !address) {
+//       return res.status(400).json({
+//         success: false,
+//         message: 'Please provide all required fields',
+//       });
+//     }
+
+//     const existingRetailer = await Retailer.findOne({ email });
+//     if (existingRetailer) {
+//       return res.status(400).json({
+//         success: false,
+//         message: 'A retailer with this email already exists',
+//       });
+//     }
+
+//     // Validate address fields
+//     if (!address.street || !address.city || !address.state || !address.zipCode) {
+//       return res.status(400).json({
+//         success: false,
+//         message: 'Please provide complete address information',
+//       });
+//     }
+
+//     // Construct full address
+//     const fullAddress = `${address.street}, ${address.city}, ${address.state}, ${address.zipCode}`;
+
+//     // Fetch coordinates using the geocoder provider from the .env file
+//     const geocodeUrl = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(
+//       fullAddress
+//     )}&format=json&addressdetails=1&limit=1`;
+
+//     const geocodeResponse = await axios.get(geocodeUrl, {
+//       timeout: parseInt(process.env.GEOCODER_TIMEOUT) || 5000,
+//     });
+
+//     if (!geocodeResponse.data || geocodeResponse.data.length === 0) {
+//       return res.status(400).json({
+//         success: false,
+//         message: 'Unable to fetch location coordinates. Please check the address.',
+//       });
+//     }
+
+//     const location = {
+//       type: 'Point',
+//       coordinates: [
+//         parseFloat(geocodeResponse.data[0].lon), // Longitude
+//         parseFloat(geocodeResponse.data[0].lat), // Latitude
+//       ],
+//     };
+
+//     const retailer = new Retailer({
+//       name,
+//       email,
+//       password, // Will be hashed by pre-save hook
+//       storeName,
+//       phone,
+//       storeDescription,
+//       address,
+//       location,
+//     });
+
+//     await retailer.save();
+
+//     const token = retailer.generateAuthToken();
+
+//     res.status(201).json({
+//       success: true,
+//       message: 'Retailer registered successfully',
+//       token,
+//       retailer: {
+//         id: retailer._id,
+//         name: retailer.name,
+//         email: retailer.email,
+//         storeName: retailer.storeName,
+//       },
+//     });
+//   } catch (error) {
+//     console.error('Retailer signup error:', error);
+//     res.status(500).json({
+//       success: false,
+//       message: 'Server error',
+//     });
+//   }
+// });
+const axios = require('axios');
+const dotenv = require('dotenv');
+dotenv.config();
+
+router.post('/signup', async (req, res) => {
   try {
-    // Extract all fields from request body
-    const { name, email, password, storeName, phone, storeDescription, address, location } = req.body;
-    
+    const { name, email, password, storeName, phone, storeDescription, address } = req.body;
+
     console.log(`Signup attempt for: ${email || 'unknown email'}`);
-    
-    // 1. Validate required fields
+
     let missingFields = [];
     if (!name) missingFields.push('name');
     if (!email) missingFields.push('email');
     if (!password) missingFields.push('password');
     if (!storeName) missingFields.push('storeName');
-    
+    if (!address) missingFields.push('address');
+
     if (missingFields.length > 0) {
-      console.log('Missing required fields:', missingFields.join(', '));
       return res.status(400).json({
         success: false,
         message: `Missing required fields: ${missingFields.join(', ')}`,
         missingFields
       });
     }
-    
-    // 2. Check if email already exists
+
     const existingRetailer = await Retailer.findOne({ email });
     if (existingRetailer) {
-      console.log('Email already exists:', email);
       return res.status(400).json({
         success: false,
         message: 'A retailer with this email already exists',
         error: 'EMAIL_ALREADY_EXISTS'
       });
     }
-    
-    // 3. Validate that either location or address is provided
-    if (!address && !location) {
-      console.log('Missing both address and location');
+
+    // Validate address object
+    if (typeof address !== 'object') {
       return res.status(400).json({
         success: false,
-        message: 'Either address or location is required',
-        error: 'ADDRESS_OR_LOCATION_REQUIRED'
+        message: 'Address must be an object containing street, city, state, and zipCode',
+        error: 'INVALID_ADDRESS_FORMAT'
       });
     }
-    
-    // 4. Validate address format if provided
-    if (address) {
-      if (typeof address !== 'object') {
-        console.log('Invalid address format (not an object)');
-        return res.status(400).json({
-          success: false,
-          message: 'Address must be an object containing street, city, state, and zipCode fields',
-          error: 'INVALID_ADDRESS_FORMAT'
-        });
-      }
-      
-      const missingAddressFields = [];
-      if (!address.street) missingAddressFields.push('street');
-      if (!address.city) missingAddressFields.push('city');
-      if (!address.state) missingAddressFields.push('state');
-      if (!address.zipCode) missingAddressFields.push('zipCode');
-      
-      if (missingAddressFields.length > 0) {
-        console.log('Incomplete address, missing fields:', missingAddressFields.join(', '));
-        return res.status(400).json({
-          success: false,
-          message: `Address is incomplete. Missing fields: ${missingAddressFields.join(', ')}`,
-          missingAddressFields
-        });
-      }
-      
-      console.log('Valid address provided for geocoding');
-    }
-    
-    // 5. Validate location format if provided
-    if (location) {
-      if (!location.type || !location.coordinates || location.type !== 'Point' || 
-          !Array.isArray(location.coordinates) || location.coordinates.length !== 2) {
-        console.log('Invalid location format');
-        return res.status(400).json({
-          success: false,
-          message: 'Invalid location format. Must be GeoJSON Point with coordinates [longitude, latitude]',
-          error: 'INVALID_LOCATION_FORMAT'
-        });
-      }
-      
-      console.log('Valid location coordinates provided');
+
+    const missingAddressFields = [];
+    if (!address.street) missingAddressFields.push('street');
+    if (!address.city) missingAddressFields.push('city');
+    if (!address.state) missingAddressFields.push('state');
+    if (!address.zipCode) missingAddressFields.push('zipCode');
+
+    if (missingAddressFields.length > 0) {
+      return res.status(400).json({
+        success: false,
+        message: `Address is incomplete. Missing fields: ${missingAddressFields.join(', ')}`,
+        missingAddressFields
+      });
     }
 
-    // 6. All validation passed, create new retailer
-    console.log('Creating new retailer account...');
-    
-    // Create retailer object with required fields
-    const retailerData = {
+    // Geocoding using OpenStreetMap
+    const fullAddress = `${address.street}, ${address.city}, ${address.state}, ${address.zipCode}`;
+    const geocodeUrl = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(
+      fullAddress
+    )}&format=json&addressdetails=1&limit=1`;
+
+    let location;
+    try {
+      const geocodeResponse = await axios.get(geocodeUrl, {
+        timeout: parseInt(process.env.GEOCODER_TIMEOUT) || 5000,
+        headers: {
+          'User-Agent': 'RetailerApp/1.0 (your_email@example.com)' // Replace with your contact email
+        }
+      });
+
+      if (!geocodeResponse.data || geocodeResponse.data.length === 0) {
+        return res.status(400).json({
+          success: false,
+          message: 'Unable to fetch location coordinates. Please check the address.',
+          error: 'GEOCODING_FAILED'
+        });
+      }
+
+      location = {
+        type: 'Point',
+        coordinates: [
+          parseFloat(geocodeResponse.data[0].lon), // Longitude
+          parseFloat(geocodeResponse.data[0].lat)  // Latitude
+        ]
+      };
+    } catch (geoError) {
+      console.error('Geocoding failed:', geoError.message);
+      return res.status(400).json({
+        success: false,
+        message: 'Could not geocode the provided address. Please check the address and try again.',
+        error: process.env.NODE_ENV === 'development' ? geoError.message : 'GEOCODING_ERROR'
+      });
+    }
+
+    // Create new retailer
+    const retailer = new Retailer({
       name,
       email,
-      password, // Will be hashed by pre-save hook
-      storeName
-    };
-    
-    // Add optional fields if they exist
-    if (phone) retailerData.phone = phone;
-    if (storeDescription) retailerData.storeDescription = storeDescription;
-    if (address) retailerData.address = address;
-    if (location) retailerData.location = location;
-    
-    // Create new retailer
-    const retailer = new Retailer(retailerData);
-    
-    // Save retailer to DB with geocoding middleware processing
+      password, // Assume pre-save hashing
+      storeName,
+      phone,
+      storeDescription,
+      address,
+      location
+    });
+
     try {
       const savedRetailer = await retailer.save();
       console.log('Retailer saved successfully with ID:', savedRetailer._id);
-      
-      if (savedRetailer.location && savedRetailer.location.coordinates) {
-        console.log('Location coordinates:', savedRetailer.location.coordinates);
-      }
+
+      const token = retailer.generateAuthToken();
+
+      return res.status(201).json({
+        success: true,
+        message: 'Retailer registered successfully',
+        token,
+        retailer: {
+          id: savedRetailer._id,
+          name: savedRetailer.name,
+          email: savedRetailer.email,
+          storeName: savedRetailer.storeName
+        }
+      });
     } catch (saveError) {
       console.error('Error saving retailer:', saveError);
       return res.status(500).json({
         success: false,
         message: 'Failed to create retailer account',
-        error: process.env.NODE_ENV === 'development' ? saveError.message : 'Database error'
+        error: process.env.NODE_ENV === 'development' ? saveError.message : 'DATABASE_ERROR'
       });
     }
 
-    // Generate JWT token for authentication
-    const token = retailer.generateAuthToken();
-
-    res.status(201).json({
-      success: true,
-      message: 'Retailer registered successfully',
-      token,
-      retailer: {
-        id: retailer._id,
-        name: retailer.name,
-        email: retailer.email,
-        storeName: retailer.storeName
-      }
-    });
   } catch (error) {
-    console.error('Retailer signup error:', error);
-    
-    // Handle specific geocoding errors
-    if (error.message && error.message.includes('Geocoding failed')) {
-      return res.status(400).json({
-        success: false,
-        message: 'Could not geocode the provided address. Please check the address and try again.',
-        error: process.env.NODE_ENV === 'development' ? error.message : undefined
-      });
-    }
-    
-    // Handle MongoDB duplicate key errors
+    console.error('Unhandled retailer signup error:', error);
+
     if (error.name === 'MongoServerError' && error.code === 11000) {
       return res.status(400).json({
         success: false,
@@ -298,26 +556,20 @@ router.post('/signup', async (req, res) => {
         error: 'EMAIL_ALREADY_EXISTS'
       });
     }
-    
-    // Handle validation errors
+
     if (error.name === 'ValidationError') {
       const validationErrors = {};
-      
       for (const field in error.errors) {
         validationErrors[field] = error.errors[field].message;
       }
-      
-      console.log('Validation error details:', validationErrors);
-      
+
       return res.status(400).json({
         success: false,
         message: 'Validation error',
         errors: validationErrors
       });
     }
-    
-    // Default error response for unhandled errors
-    console.error('Unhandled error in retailer signup:', error);
+
     res.status(500).json({
       success: false,
       message: 'Server error',
@@ -325,6 +577,7 @@ router.post('/signup', async (req, res) => {
     });
   }
 });
+
 
 /**
  * @swagger
